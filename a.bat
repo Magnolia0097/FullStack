@@ -1,4 +1,4 @@
 git pull
-git add --all
+git add .
 git commit -m "Arduino Study at %date%-[%time:~0,5%]"
-git push
+git push origin master
