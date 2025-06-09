@@ -5,6 +5,8 @@ import com.example.fullstackbackend.model.User;
 import com.example.fullstackbackend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page; // Added import
+import org.springframework.data.domain.Pageable; // Added import
 
 import java.util.List;
 
@@ -21,8 +23,8 @@ public class UserController {
     }
 
     @GetMapping("/users")
-    List<User> getAllusers(){
-        return userRepository.findAll();
+    Page<User> getAllusers(Pageable pageable){ // Added Pageable parameter, changed return type
+        return userRepository.findAll(pageable); // Call findAll with pageable
     }
 
 
@@ -34,14 +36,17 @@ public class UserController {
 
     //업데이트
     @PutMapping("/user/{id}")
-    User updateUser(@RequestBody User newUser,@PathVariable Long id){
+    User updateUser(@RequestBody User newUser, @PathVariable Long id) {
+        // First, check if the user exists. If not, UserNotFoundException will be thrown.
+        userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+
+        // Call the custom update method
+        userRepository.updateUserDetails(id, newUser.getUsername(), newUser.getName(), newUser.getEmail());
+
+        // Fetch and return the updated user
         return userRepository.findById(id)
-                .map(user -> {
-                    user.setUsername(newUser.getUsername());
-                    user.setName(newUser.getName());
-                    user.setEmail(newUser.getEmail());
-                    return userRepository.save(user);
-                }).orElseThrow(()->new UserNotFoundException(id));
+                .orElseThrow(() -> new UserNotFoundException(id)); // Should not happen if update was successful and ID is valid
     }
 
     //삭제

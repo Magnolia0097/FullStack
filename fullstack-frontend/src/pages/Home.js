@@ -5,21 +5,50 @@ import { Link, useParams } from 'react-router-dom';
 export default function Home() {
 
     const[users,setUsers]=useState([]);
+    const [currentPage, setCurrentPage] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
+    const pageSize = 10; // Fixed page size
 
-    const {id}=useParams()
+    // const {id}=useParams() // This useParams is not used in Home.js, can be kept or removed. Keeping for now.
 
     useEffect(() => {
-        loadUsers();
-      }, []);
+        loadUsers(currentPage, pageSize);
+      }, []); // Effect runs once on mount to load initial data
 
-    const loadUsers = async () => {
-        const result = await axios.get("http://localhost:8080/users");
-        setUsers(result.data);
+    const loadUsers = async (page = 0, size = pageSize) => {
+        try {
+            const result = await axios.get(`http://localhost:8080/users?page=${page}&size=${size}`);
+            if (result.data.content) {
+                setUsers(result.data.content);
+                setTotalPages(result.data.totalPages);
+                setCurrentPage(result.data.number);
+            } else { // Handle cases where content might be missing, though Spring Page usually has it
+                setUsers([]);
+                setTotalPages(0);
+                setCurrentPage(0);
+            }
+        } catch (error) {
+            console.error("Error loading users:", error);
+            setUsers([]);
+            setTotalPages(0);
+            setCurrentPage(0);
+        }
     };
 
     const deleteUser=async (id)=>{
-        await axios.delete(`http://localhost:8080/user/${id}`)
-        loadUsers()
+        try {
+            await axios.delete(`http://localhost:8080/user/${id}`);
+            // After deletion, reload users.
+            // If the current page had only one item and it was deleted,
+            // and it was not the first page, we might want to go to the previous page.
+            let pageToLoad = currentPage;
+            if (users.length === 1 && currentPage > 0) {
+                pageToLoad = currentPage - 1;
+            }
+            loadUsers(pageToLoad, pageSize);
+        } catch (error) {
+            console.error("Error deleting user:", error);
+        }
     }
 
   return (
@@ -38,10 +67,11 @@ export default function Home() {
             </thead>
             <tbody>
                 {
-                    users.map((user,index)=>(
-                <tr>
-                    <th scope="row" key={index}>
-                        {index + 1}
+                    users.map((user,index)=>( // user.id should be used for key if available and unique
+                <tr key={user.id || index}>
+                    <th scope="row">
+                        {/* This index is relative to the page, not overall index */}
+                        {currentPage * pageSize + index + 1}
                     </th>
                     <td>{user.name}</td>
                     <td>{user.username}</td>
@@ -68,6 +98,30 @@ export default function Home() {
 
             </tbody>
             </table>
+            {totalPages > 0 && (
+            <div className="d-flex justify-content-center align-items-center my-3">
+                <button
+                    className="btn btn-outline-primary mx-1"
+                    onClick={() => loadUsers(currentPage - 1, pageSize)}
+                    disabled={currentPage === 0}
+                >
+                    Previous
+                </button>
+                <span className="mx-2">
+                    Page {currentPage + 1} of {totalPages}
+                </span>
+                <button
+                    className="btn btn-outline-primary mx-1"
+                    onClick={() => loadUsers(currentPage + 1, pageSize)}
+                    disabled={currentPage >= totalPages - 1}
+                >
+                    Next
+                </button>
+            </div>
+            )}
+            {totalPages === 0 && users.length === 0 && (
+                <p className="text-center">No users found.</p>
+            )}
         </div>
     </div>
   )
